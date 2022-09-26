@@ -88,6 +88,87 @@ def reviews(url, pages):                                                        
         except:
             pass 
 
+def order_item(zomato_review):
+    final=pd.DataFrame()
+
+    for i in list(zomato_review['url']):
+        i = i.replace('info','')
+        print('https://www.zomato.com/webroutes/getPage?page_url='+i+'order')
+        agent = requests.get('https://www.zomato.com/webroutes/getPage?page_url='+i+'order',headers={"User-Agent":"Mozilla/5.0",'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Charset': 'ISO-8859-1,utf-8;q=0.7,*;q=0.3',
+                'Accept-Encoding': 'none',
+                'Accept-Language': 'en-US,en;q=0.8',
+                'Connection': 'keep-alive'})
+        # time.sleep(5)
+        tag =BS(agent.content, 'html.parser')
+
+        for j in range(0,50):
+            for k in [0,2]:
+                for l in range(0,30):
+                    try:
+                        reviews_xx = json.loads(tag.text)['page_data']['order']['menuList']['menus'][j]['menu']['categories'][k]['category']['items'][l]['item']
+                        main_menu_xx=json.loads(tag.text)['page_data']['order']['menuList']['menus'][j]['menu']['categories'][k]['category']['items'][l]['item']['search_alias']
+                        rest_id = json.loads(tag.text)['page_info']['resId']
+                        reviews_xx= pd.DataFrame.from_dict(reviews_xx, orient='index')
+                        reviews_xx = reviews_xx.transpose()
+                        reviews_xx['Dish_type']=main_menu_xx
+                        reviews_xx['rest_id']=rest_id
+                        final=final.append(reviews_xx)
+                    except:
+                        pass
+
+    return final
+
+def overview(zomato_review):   
+    final_df=pd.DataFrame()
+    final=pd.DataFrame()
+    for i in list(zomato_review['url']):
+        i = i.replace('info','')
+        agent = requests.get('https://www.zomato.com/webroutes/getPage?page_url='+i,headers={"User-Agent":"Mozilla/5.0",'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Charset': 'ISO-8859-1,utf-8;q=0.7,*;q=0.3',
+            'Accept-Encoding': 'none',
+            'Accept-Language': 'en-US,en;q=0.8',
+            'Connection': 'keep-alive'})
+        time.sleep(5)
+        tag =BS(agent.content, 'html.parser')
+
+        # Fetching Data
+        rest_id = json.loads(tag.text)['page_info']['resId']
+        is_perm_closed = json.loads(tag.text)['page_data']['sections']['SECTION_BASIC_INFO']['is_perm_closed']
+        is_temp_closed = json.loads(tag.text)['page_data']['sections']['SECTION_BASIC_INFO']['is_temp_closed']
+        is_opening_soon = json.loads(tag.text)['page_data']['sections']['SECTION_BASIC_INFO']['is_opening_soon']
+        should_ban_ugc = json.loads(tag.text)['page_data']['sections']['SECTION_BASIC_INFO']['should_ban_ugc']
+        is_shelled = json.loads(tag.text)['page_data']['sections']['SECTION_BASIC_INFO']['is_shelled']
+        media_alert = json.loads(tag.text)['page_data']['sections']['SECTION_BASIC_INFO']['media_alert']
+        is_delivery_only = json.loads(tag.text)['page_data']['sections']['SECTION_BASIC_INFO']['is_delivery_only']
+        # title = json.loads(tag.text)['page_data']['sections']['SECTION_RES_DETAILS']['PEOPLE_LIKED']['title']
+        # description = json.loads(tag.text)['page_data']['sections']['SECTION_RES_DETAILS']['PEOPLE_LIKED']['description']
+        cuisine = json.loads(tag.text)['page_data']['sections']['SECTION_BASIC_INFO']['cuisine_string']
+        timing = json.loads(tag.text)['page_data']['sections']['SECTION_BASIC_INFO']['timing']['timing_desc']
+        locality  = json.loads(tag.text)['page_data']['sections']['SECTION_RES_HEADER_DETAILS']['LOCALITY']['text']
+
+        final_df.loc[0,'is_perm_closed'] = is_perm_closed
+        final_df['rest_id'] = rest_id
+        final_df['is_temp_closed']= is_temp_closed
+        final_df['is_opening_soon']= is_opening_soon
+        final_df['should_ban_ugc']= should_ban_ugc
+        final_df['is_shelled']= is_shelled
+        final_df['media_alert']= media_alert
+        final_df['is_delivery_only']= is_delivery_only
+        # final_df['title']= title
+        # final_df['description']= description
+        final_df['cuisine']= cuisine
+        final_df['timing']= timing
+        final_df['locality']= locality
+        highlights = pd.DataFrame(json.loads(tag.text)['page_data']['sections']['SECTION_RES_DETAILS']['HIGHLIGHTS']['highlights'])[['text','type']].T
+        new_header = highlights.iloc[0]
+        highlights.columns = new_header
+        highlights = highlights[1:].reset_index()
+        details =pd.DataFrame.from_dict(json.loads(tag.text)['page_data']['sections']['SECTION_RES_CONTACT'], orient='index').T
+        df = pd.concat([final_df, highlights,details], axis=1)
+        final=final.append(df)
+    return final
+
 
 if __name__=='__main__':
     pub_url="https://www.zomato.com/bangalore/koramangala-restaurants/bar"
@@ -104,6 +185,11 @@ if __name__=='__main__':
             zomato_review.to_excel('reviews_'+str(ids)+'.xlsx')
         except KeyError as e:
             pass
+
+    # Pull order list data
+    order_list = order_item(zomato_review)
+    # Pull overview data
+    overview_of_the_rest = overview(zomato_review)
             
 
-    
+   
